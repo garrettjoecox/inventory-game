@@ -1,10 +1,12 @@
 import { Action, configureStore, ThunkAction } from '@reduxjs/toolkit';
 import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import { itemsReducer } from 'src/state/itemsSlice';
+import { windowsReducer } from 'src/state/windowsSlice';
 
 export const store = configureStore({
   reducer: {
     items: itemsReducer,
+    windows: windowsReducer,
   },
 });
 

@@ -1,4 +1,5 @@
 import { ChakraProvider } from '@chakra-ui/react';
+import 'focus-visible/dist/focus-visible';
 import type { AppProps } from 'next/app';
 import React from 'react';
 import { Provider as ReduxProvider } from 'react-redux';

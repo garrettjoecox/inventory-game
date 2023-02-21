@@ -1,43 +1,72 @@
 /* eslint-disable consistent-return */
-import { Box, Button, Flex, SimpleGrid, Spacer, Text, VStack } from '@chakra-ui/react';
+import { Box, Button, Flex, Spacer, Text } from '@chakra-ui/react';
 import { EntityId } from '@reduxjs/toolkit';
 import React, { FC, useCallback, useEffect, useRef } from 'react';
+import usePortal from 'react-cool-portal';
 import useDraggable from 'src/hooks/useDraggable';
 import useResizeable from 'src/hooks/useResizeable';
 import { useAppDispatch, useAppSelector } from 'src/state';
-import { initItems, selectItemsByParentItemId } from 'src/state/itemsSlice';
+import {
+  initItems,
+  Item,
+  moveItem,
+  selectItemById,
+  selectItemsByParentItemId,
+  selectItemsByType,
+} from 'src/state/itemsSlice';
 import { closeWindow, focusWindow, openWindow, selectAllWindows, selectWindowById } from 'src/state/windowsSlice';
 
 export default function Index() {
   const dispatch = useAppDispatch();
+  const vaults = useAppSelector(selectItemsByType)(/^container:vault/);
+  const workers = useAppSelector(selectItemsByType)(/^worker/);
 
   useEffect(() => {
     dispatch(
       initItems([
         {
           id: '1',
-          parentItemId: null,
-          name: 'Bag 1',
+          parentItemId: '7',
+          name: 'Small Bag',
+          type: 'container:bag',
+          size: 3,
         },
         {
           id: '2',
-          parentItemId: null,
-          name: 'Bag 2',
+          parentItemId: '7',
+          name: 'Large Bag',
+          type: 'container:bag',
+          size: 18,
         },
         {
           id: '3',
-          parentItemId: '1',
+          parentItemId: '7',
           name: 'Stone',
+          type: 'resource:stone',
         },
         {
           id: '4',
-          parentItemId: '2',
+          parentItemId: '7',
           name: 'Wheat',
+          type: 'resource:wheat',
         },
         {
           id: '5',
           parentItemId: '1',
           name: 'Wood',
+          type: 'resource:wood',
+        },
+        {
+          id: '6',
+          parentItemId: null,
+          name: 'Worker 1',
+          type: 'worker:main',
+        },
+        {
+          id: '7',
+          parentItemId: null,
+          name: 'Vault',
+          type: 'container:vault',
         },
       ]),
     );
@@ -46,31 +75,21 @@ export default function Index() {
   return (
     <Box>
       <WindowsContainer />
-      <VStack spacing="2">
-        <Button
-          onClick={() => {
-            dispatch(openWindow({ title: 'Bag 1', type: 'bag', params: { id: '1' } }));
-          }}>
-          Open bag 1
-        </Button>
-        <Button
-          onClick={() => {
-            dispatch(openWindow({ title: 'Bag 2', type: 'bag', params: { id: '2' } }));
-          }}>
-          Open bag 2
-        </Button>
-        <Button
-          onClick={() => {
-            dispatch(openWindow({ title: 'Crafting table' }));
-          }}>
-          Open crafting table
-        </Button>
-      </VStack>
+      <Flex wrap="wrap" p="2">
+        {vaults.map(item => (
+          <ItemBox key={item.id} itemId={item.id} />
+        ))}
+      </Flex>
+      <Flex wrap="wrap" p="2">
+        {workers.map(item => (
+          <ItemBox key={item.id} itemId={item.id} />
+        ))}
+      </Flex>
     </Box>
   );
 }
 
-const Window: FC<{ id: EntityId }> = ({ id, children }) => {
+const Window: FC<{ id: EntityId; focused: boolean }> = ({ id, children, focused }) => {
   const wwindow = useAppSelector(state => selectWindowById(state, id));
   const dispatch = useAppDispatch();
   const focusedRef = useRef<HTMLDivElement>(null);
@@ -82,7 +101,7 @@ const Window: FC<{ id: EntityId }> = ({ id, children }) => {
       bottom: window.innerHeight,
     },
   });
-  const { resizeableHandleRef, resizeableRef } = useResizeable({ minHeight: 200, minWidth: 200 });
+  const { resizeableHandleRef, resizeableRef } = useResizeable({ minHeight: 250, minWidth: 250 });
 
   useEffect(() => {
     if (!focusedRef.current) {
@@ -103,9 +122,14 @@ const Window: FC<{ id: EntityId }> = ({ id, children }) => {
       key={wwindow.id}
       position="absolute"
       bgColor="gray.50"
+      borderColor={focused ? 'gray.400' : 'gray.200'}
       borderWidth="2px"
-      height="200px"
-      width="200px"
+      height="250px"
+      maxHeight="250px"
+      width="250px"
+      maxWidth="250px"
+      display="flex"
+      flexDirection="column"
       ref={el => {
         focusedRef.current = el;
         draggableRef.current = el;
@@ -123,12 +147,14 @@ const Window: FC<{ id: EntityId }> = ({ id, children }) => {
           onClick={() => {
             dispatch(closeWindow(id));
           }}>
-          X
+          ╳
         </Button>
       </Flex>
-      <Box p="2">{children}</Box>
+      <Box overflow="auto" height="full">
+        {children}
+      </Box>
       <Box
-        bgColor="red"
+        bgColor="gray.200"
         height="20px"
         width="20px"
         position="absolute"
@@ -140,42 +166,165 @@ const Window: FC<{ id: EntityId }> = ({ id, children }) => {
   );
 };
 
-const BagWindow: FC<{ id: EntityId }> = ({ id }) => {
+const ContainerWindow: FC<{ id: EntityId; focused: boolean }> = ({ id, focused }) => {
   const wwindow = useAppSelector(state => selectWindowById(state, id));
-  const items = useAppSelector(state => selectItemsByParentItemId(state)(wwindow.params.id));
+  const containerItem = useAppSelector(state => selectItemById(state, wwindow.id) as Item);
+  const items = useAppSelector(state => selectItemsByParentItemId(state)(wwindow.id));
+  const emptySlots = containerItem.size ? containerItem.size - items.length : 0;
+  const emptySlotItems = Array.from({ length: emptySlots });
 
   return (
-    <Window id={id}>
-      <SimpleGrid minChildWidth="64px" spacing="10px">
+    <Window id={id} focused={focused}>
+      <Flex wrap="wrap" p="2" height="full" alignContent="flex-start" data-container-id={containerItem.id}>
         {items.map(item => (
-          <Box bgColor="gray.200" borderWidth="2px" borderColor="gray.300" height="64px" width="64px" key={item.id}>
-            {item.name}
-          </Box>
+          <ItemBox key={item.id} itemId={item.id} data-container-id={containerItem.id} />
         ))}
-      </SimpleGrid>
+        {emptySlots > 0 &&
+          emptySlotItems.map((_, index) => (
+            <Box
+              key={index.toString()}
+              data-container-id={containerItem.id}
+              borderWidth="2px"
+              borderColor="gray.200"
+              height="64px"
+              width="64px"
+              m="2"
+            />
+          ))}
+      </Flex>
+    </Window>
+  );
+};
+
+const WorkerWindow: FC<{ id: EntityId; focused: boolean }> = ({ id, focused }) => {
+  const wwindow = useAppSelector(state => selectWindowById(state, id));
+  const items = useAppSelector(state => selectItemsByParentItemId(state)(wwindow.id));
+
+  return (
+    <Window id={id} focused={focused}>
+      <Flex wrap="wrap" p="2" height="full" alignContent="flex-start">
+        {items.map(item => (
+          <ItemBox key={item.id} itemId={item.id} />
+        ))}
+      </Flex>
     </Window>
   );
 };
 
 const componentMap = {
-  bag: BagWindow,
+  container: ContainerWindow,
+  worker: WorkerWindow,
 };
 
 function WindowsContainer() {
   const windows = useAppSelector(selectAllWindows);
 
-  const renderWindow = useCallback((wwindow: any) => {
-    if (componentMap[wwindow.type]) {
-      const TempComp = componentMap[wwindow.type];
-      return <TempComp key={wwindow.id} id={wwindow.id} />;
-    }
+  const renderWindow = useCallback(
+    (wwindow: any, index: number) => {
+      if (componentMap[wwindow.type]) {
+        const TempComp = componentMap[wwindow.type];
+        return <TempComp key={wwindow.id} id={wwindow.id} focused={index === windows.length - 1} />;
+      }
 
-    return <Window key={wwindow.id} id={wwindow.id} />;
-  }, []);
+      return <Window key={wwindow.id} id={wwindow.id} focused={index === windows.length - 1} />;
+    },
+    [windows.length],
+  );
 
   return (
-    <Box zIndex="modal" position="absolute">
+    <Box zIndex="1" position="absolute">
       {windows.map(renderWindow)}
     </Box>
   );
 }
+
+const ItemBox: FC<{ itemId: EntityId }> = ({ itemId, ...props }) => {
+  const item = useAppSelector(state => selectItemById(state, itemId) as Item);
+  const { Portal, isShow, show, hide, toggle } = usePortal({
+    defaultShow: false,
+    onShow: e => {},
+    onHide: e => {},
+  });
+  const { draggableHandleRef, draggableRef, forceDragEnd } = useDraggable({
+    bounds: {
+      top: 0,
+      left: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight,
+    },
+    onDragStart: e => {
+      show();
+    },
+    onDragEnd: e => {
+      if (e.target?.dataset?.containerId) {
+        dispatch(moveItem({ id: itemId, parentItemId: e.target.dataset.containerId }));
+      }
+      hide();
+    },
+  });
+  const dispatch = useAppDispatch();
+
+  return isShow ? (
+    <>
+      <Box borderWidth="2px" borderColor="gray.200" height="64px" width="64px" m="2" />
+      <Portal>
+        <Box
+          zIndex="2"
+          pointerEvents="none"
+          position="absolute"
+          ref={draggableRef}
+          bgColor="gray.200"
+          borderWidth="2px"
+          borderColor="gray.300"
+          height="64px"
+          width="64px"
+          m="2"
+          display="flex"
+          fontSize="sm"
+          textAlign="center"
+          alignItems="center"
+          justifyContent="center">
+          {item.name}
+        </Box>
+      </Portal>
+    </>
+  ) : (
+    <Box
+      {...props}
+      ref={draggableHandleRef}
+      bgColor="gray.200"
+      borderWidth="2px"
+      borderColor="gray.300"
+      height="64px"
+      width="64px"
+      m="2"
+      display="flex"
+      fontSize="sm"
+      textAlign="center"
+      alignItems="center"
+      justifyContent="center"
+      onClick={() => {
+        if (item.type.match(/^container/)) {
+          dispatch(
+            openWindow({
+              id: item.id,
+              title: item.name,
+              type: 'container',
+              params: {},
+            }),
+          );
+        } else if (item.type.match(/^worker/)) {
+          dispatch(
+            openWindow({
+              id: item.id,
+              title: item.name,
+              type: 'worker',
+              params: {},
+            }),
+          );
+        }
+      }}>
+      {item.name}
+    </Box>
+  );
+};

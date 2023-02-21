@@ -1,7 +1,7 @@
-import { createEntityAdapter, createSlice, EntityId, nanoid, PayloadAction } from '@reduxjs/toolkit';
+import { createEntityAdapter, createSlice, EntityId, PayloadAction } from '@reduxjs/toolkit';
 import type { AppState } from '.';
 
-export type WindowType = 'bag';
+export type WindowType = 'container' | 'worker';
 
 export interface Window {
   id: string;
@@ -33,9 +33,8 @@ export const windowsSlice = createSlice({
     initWindows(state, action: PayloadAction<Window[]>) {
       return windowsAdapter.setAll(state, action.payload);
     },
-    openWindow(state, action: PayloadAction<Omit<Window, 'id' | 'focusedAt'>>) {
-      return windowsAdapter.addOne(state, {
-        id: nanoid(),
+    openWindow(state, action: PayloadAction<Omit<Window, 'focusedAt'>>) {
+      return windowsAdapter.setOne(state, {
         focusedAt: Date.now(),
         ...action.payload,
       });

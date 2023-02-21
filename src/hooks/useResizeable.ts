@@ -31,8 +31,10 @@ export default function useResizeable({ minHeight, minWidth }: { minHeight: numb
 
       const { x, y } = resizeable.getBoundingClientRect();
 
-      resizeable.style.width = `${Math.max(minWidth, e.clientX - x + mouseDownPos.x)}px`;
-      resizeable.style.height = `${Math.max(minHeight, e.clientY - y + mouseDownPos.y)}px`;
+      resizeable.style.maxWidth = `${Math.max(minWidth, e.clientX - x + mouseDownPos.x)}px`;
+      resizeable.style.maxHeight = `${Math.max(minHeight, e.clientY - y + mouseDownPos.y)}px`;
+      resizeable.style.width = resizeable.style.maxWidth;
+      resizeable.style.height = resizeable.style.maxHeight;
     };
     const handleMouseUp = () => {
       setMouseDownPos(null);
